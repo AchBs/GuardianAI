@@ -1,0 +1,19 @@
+# Guardian AI - Smart City Security & Optimisation
+# Sfax, Tunisia | Python >= 3.10
+
+# Core data & science
+numpy>=1.24
+pandas>=1.5
+scipy>=1.10
+
+# Web API & real-time dashboard
+fastapi>=0.100
+uvicorn[standard]>=0.22
+
+# Visualisation (standalone demo)
+matplotlib>=3.7
+
+# Optional: enhanced dashboard & ML
+# streamlit>=1.28          # pip install streamlit
+# plotly>=5.17             # pip install plotly
+# scikit-learn>=1.3        # pip install scikit-learn  (for Isolation Forest)

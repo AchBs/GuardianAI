@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Guardian AI — Sfax Smart City Security Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── CSS Variables ──────────────────────────────────── */
+    :root {
+      --bg-deep:   #050d1a;
+      --bg-card:   #0c1b2e;
+      --bg-card2:  #112240;
+      --accent:    #00d4ff;
+      --accent2:   #7b2fff;
+      --safe:      #00e676;
+      --danger:    #ff1744;
+      --warning:   #ffab00;
+      --text:      #ccd6f6;
+      --text-dim:  #8892b0;
+      --border:    #1d3a5c;
+      --font:      'Segoe UI', system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-deep);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      background: linear-gradient(90deg, #020b17 0%, #0a1628 50%, #020b17 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo-shield {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .header-title h1 { font-size: 1.25rem; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+    .header-title p  { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .time-display { font-size: 0.85rem; color: var(--text-dim); }
+    .connection-badge {
+      padding: 4px 12px; border-radius: 20px;
+      font-size: 0.75rem; font-weight: 600;
+      background: #0a3020; color: var(--safe);
+      border: 1px solid var(--safe);
+    }
+    .connection-badge.connecting { background: #2a2000; color: var(--warning); border-color: var(--warning); }
+    .connection-badge.disconnected { background: #2a0010; color: var(--danger); border-color: var(--danger); }
+
+    /* ── Alert Banner ───────────────────────────────────── */
+    #alert-banner {
+      display: none;
+      background: var(--danger);
+      color: #fff;
+      text-align: center;
+      padding: 10px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      animation: blink-bg 0.8s ease-in-out infinite;
+      position: sticky; top: 68px; z-index: 99;
+    }
+    @keyframes blink-bg {
+      0%, 100% { background: #ff1744; }
+      50%       { background: #8b0000; }
+    }
+
+    /* ── Main layout ─────────────────────────────────────── */
+    .container { padding: 20px 24px; max-width: 1600px; margin: 0 auto; }
+
+    /* ── Control bar ─────────────────────────────────────── */
+    .controls {
+      display: flex; align-items: center; gap: 14px;
+      flex-wrap: wrap; margin-bottom: 18px;
+    }
+    .controls label { font-size: 0.8rem; color: var(--text-dim); }
+    .controls select, .controls input[type=range] {
+      background: var(--bg-card2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 5px 10px; font-size: 0.82rem;
+    }
+    .btn {
+      padding: 7px 20px; border-radius: 8px; border: none; cursor: pointer;
+      font-size: 0.85rem; font-weight: 600; transition: opacity .2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; }
+    .btn-danger  { background: var(--danger); color: #fff; }
+    .btn-reset   { background: var(--bg-card2); color: var(--text); border: 1px solid var(--border); }
+    .speed-label { font-size: 0.78rem; color: var(--text-dim); }
+
+    /* ── KPI cards ───────────────────────────────────────── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px; margin-bottom: 20px;
+    }
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px;
+      position: relative; overflow: hidden;
+    }
+    .kpi-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+    .kpi-card.danger::before { background: var(--danger); }
+    .kpi-card.safe::before   { background: var(--safe); }
+    .kpi-card.warn::before   { background: var(--warning); }
+
+    .kpi-icon  { font-size: 1.5rem; margin-bottom: 6px; }
+    .kpi-value { font-size: 1.8rem; font-weight: 800; color: var(--accent); line-height: 1; }
+    .kpi-card.danger .kpi-value { color: var(--danger); }
+    .kpi-card.safe   .kpi-value { color: var(--safe); }
+    .kpi-card.warn   .kpi-value { color: var(--warning); }
+    .kpi-label { font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ── Charts grid ──────────────────────────────────────── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px; margin-bottom: 20px;
+    }
+    @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px;
+    }
+    .chart-card h3 {
+      font-size: 0.85rem; font-weight: 600;
+      color: var(--text-dim); margin-bottom: 12px;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .chart-card canvas { width: 100% !important; }
+
+    /* ── Bottom grid ──────────────────────────────────────── */
+    .bottom-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px; margin-bottom: 20px;
+    }
+    @media (max-width: 1000px) { .bottom-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 680px)  { .bottom-grid { grid-template-columns: 1fr; } }
+
+    /* ── Attack log ───────────────────────────────────────── */
+    .attack-log {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px;
+    }
+    .attack-log h3 {
+      font-size: 0.85rem; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .log-entries { max-height: 200px; overflow-y: auto; }
+    .log-entry {
+      display: flex; gap: 8px; align-items: flex-start;
+      padding: 5px 0; border-bottom: 1px solid #0d2040;
+      font-size: 0.76rem;
+    }
+    .log-entry:last-child { border-bottom: none; }
+    .log-time  { color: var(--text-dim); min-width: 40px; }
+    .log-type  {
+      padding: 2px 7px; border-radius: 4px; font-size: 0.68rem; font-weight: 700;
+      min-width: 80px; text-align: center;
+    }
+    .spike         { background: #3d0000; color: #ff6b6b; }
+    .blackout_mask { background: #1a1a00; color: #ffd700; }
+    .gradual_drift { background: #001a3d; color: #60a5fa; }
+    .coordinated   { background: #2d0040; color: #c084fc; }
+    .detected      { background: #003d10; color: #4ade80; }
+    .log-detail { color: var(--text); flex: 1; }
+
+    /* ── Progress/simulation bar ─────────────────────────── */
+    .progress-wrap { margin-bottom: 20px; }
+    .progress-label { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .progress-bar-bg {
+      background: var(--bg-card2); border-radius: 6px; height: 8px;
+    }
+    .progress-bar-fill {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      height: 8px; border-radius: 6px; width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    /* ── Architecture diagram ────────────────────────────── */
+    .arch-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px;
+    }
+    .arch-card h3 { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+    .arch-layers { display: flex; flex-direction: column; gap: 8px; }
+    .arch-layer {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; border-radius: 8px; font-size: 0.78rem;
+    }
+    .layer-edge     { background: #0a1628; border-left: 3px solid var(--accent); }
+    .layer-comm     { background: #0a1628; border-left: 3px solid var(--warning); }
+    .layer-ai       { background: #0a1628; border-left: 3px solid var(--accent2); }
+    .layer-optimize { background: #0a1628; border-left: 3px solid var(--safe); }
+    .arch-layer span { color: var(--text-dim); }
+
+    /* ── Detection gauge ─────────────────────────────────── */
+    .gauge-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px; text-align: center;
+    }
+    .gauge-card h3 { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+    .gauge-ring {
+      width: 120px; height: 120px; border-radius: 50%;
+      margin: 0 auto 10px;
+      background: conic-gradient(var(--safe) 0% var(--f1), var(--bg-card2) var(--f1) 100%);
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      --f1: 0%;
+    }
+    .gauge-inner {
+      width: 85px; height: 85px; background: var(--bg-card);
+      border-radius: 50%; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .gauge-pct   { font-size: 1.5rem; font-weight: 800; color: var(--safe); }
+    .gauge-sublabel { font-size: 0.65rem; color: var(--text-dim); }
+
+    /* ── Footer ──────────────────────────────────────────── */
+    footer {
+      text-align: center; padding: 18px;
+      font-size: 0.72rem; color: var(--text-dim);
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ──────────────────────────────────────────────────────── -->
+<header>
+  <div class="header-left">
+    <div class="logo-shield">🛡️</div>
+    <div class="header-title">
+      <h1>GUARDIAN AI</h1>
+      <p>Smart City Security &amp; Optimisation · Sfax, Tunisia</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="time-display" id="clock">--:--:--</div>
+    <div class="connection-badge connecting" id="conn-badge">● Connecting…</div>
+  </div>
+</header>
+
+<!-- ── ATTACK ALERT BANNER ─────────────────────────────────────────── -->
+<div id="alert-banner">
+  🚨 FDI ATTACK DETECTED &amp; BLOCKED — MALICIOUS DATA NEUTRALISED 🚨
+</div>
+
+<!-- ── MAIN CONTAINER ──────────────────────────────────────────────── -->
+<div class="container">
+
+  <!-- Controls -->
+  <div class="controls">
+    <label>Attack Probability:
+      <select id="attack-prob">
+        <option value="0.02">Low (2%)</option>
+        <option value="0.04" selected>Medium (4%)</option>
+        <option value="0.08">High (8%)</option>
+        <option value="0.12">Extreme (12%)</option>
+      </select>
+    </label>
+    <label>Speed:
+      <input type="range" id="speed-slider" min="20" max="300" value="50" step="10"/>
+    </label>
+    <span class="speed-label" id="speed-label">50 ms/pt</span>
+    <button class="btn btn-primary" id="btn-start" onclick="startSimulation()">▶ Start Simulation</button>
+    <button class="btn btn-reset"   id="btn-reset" onclick="resetSimulation()">↺ Reset</button>
+  </div>
+
+  <!-- Simulation progress -->
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span>Simulation Progress</span>
+      <span id="progress-text">0 / 1440 minutes</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+  </div>
+
+  <!-- KPI cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card safe">
+      <div class="kpi-icon">⚡</div>
+      <div class="kpi-value" id="kpi-savings">0.0%</div>
+      <div class="kpi-label">Energy Saved</div>
+    </div>
+    <div class="kpi-card danger" id="kpi-attacks-card">
+      <div class="kpi-icon">⚠️</div>
+      <div class="kpi-value" id="kpi-attacks">0</div>
+      <div class="kpi-label">Attacks Detected</div>
+    </div>
+    <div class="kpi-card warn">
+      <div class="kpi-icon">🌿</div>
+      <div class="kpi-value" id="kpi-co2">0 kg</div>
+      <div class="kpi-label">CO₂ Avoided</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">💧</div>
+      <div class="kpi-value" id="kpi-water">0 m³</div>
+      <div class="kpi-label">Water Optimised</div>
+    </div>
+    <div class="kpi-card safe">
+      <div class="kpi-icon">💰</div>
+      <div class="kpi-value" id="kpi-cost">0 TND</div>
+      <div class="kpi-label">Daily Savings</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">🔒</div>
+      <div class="kpi-value" id="kpi-uptime">100%</div>
+      <div class="kpi-label">System Uptime</div>
+    </div>
+  </div>
+
+  <!-- Main charts -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>⚡ Public Lighting (kW)</h3>
+      <canvas id="chart-lighting" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>💧 Water Distribution (L/min)</h3>
+      <canvas id="chart-water" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- Energy savings chart (full width) -->
+  <div class="chart-card" style="margin-bottom:16px;">
+    <h3>📊 Cumulative Energy Savings (%) — Target: 30%</h3>
+    <canvas id="chart-savings" height="110"></canvas>
+  </div>
+
+  <!-- Bottom section -->
+  <div class="bottom-grid">
+
+    <!-- Attack log -->
+    <div class="attack-log">
+      <h3>🛡️ Security Event Log</h3>
+      <div class="log-entries" id="attack-log">
+        <div class="log-entry">
+          <span class="log-time">--:--</span>
+          <span class="log-type detected">SYSTEM</span>
+          <span class="log-detail">Guardian AI initialised. Awaiting simulation…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture -->
+    <div class="arch-card">
+      <h3>🏗️ System Architecture</h3>
+      <div class="arch-layers">
+        <div class="arch-layer layer-edge">
+          <span>📡</span>
+          <div><strong>Edge Layer</strong><br/><span>IoT sensors · Secure boot · HMAC-signed messages</span></div>
+        </div>
+        <div class="arch-layer layer-comm">
+          <span>🔐</span>
+          <div><strong>Comm Layer</strong><br/><span>TLS 1.3 · MQTT-S · Replay protection · Zero-Trust</span></div>
+        </div>
+        <div class="arch-layer layer-ai">
+          <span>🧠</span>
+          <div><strong>AI Detection Layer</strong><br/><span>Z-Score · IQR · RoC · Rolling Z · Ensemble</span></div>
+        </div>
+        <div class="arch-layer layer-optimize">
+          <span>⚡</span>
+          <div><strong>Optimisation Engine</strong><br/><span>Adaptive dimming · Demand-response · Leak detection</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detection gauge -->
+    <div class="gauge-card">
+      <h3>🎯 Detection Performance</h3>
+      <div class="gauge-ring" id="gauge-ring">
+        <div class="gauge-inner">
+          <div class="gauge-pct" id="gauge-pct">—</div>
+          <div class="gauge-sublabel">F1 Score</div>
+        </div>
+      </div>
+      <div style="font-size:0.78rem; margin-top:8px;">
+        <div style="display:flex; justify-content:space-between; color:var(--text-dim); margin-bottom:4px;">
+          <span>Precision</span><span id="metric-precision">—</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; color:var(--text-dim); margin-bottom:4px;">
+          <span>Recall</span><span id="metric-recall">—</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; color:var(--text-dim);">
+          <span>Accuracy</span><span id="metric-accuracy">—</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<footer>
+  Guardian AI v1.0 · Sfax Smart City · Protected by Zero-Trust Architecture · &copy; 2025
+</footer>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────
+let ws           = null;
+let chartLight   = null;
+let chartWater   = null;
+let chartSavings = null;
+let attackCount  = 0;
+let isAttacking  = false;
+let alertTimer   = null;
+let totalPoints  = 1440;
+let co2Saved     = 0;
+let waterSaved   = 0;
+let costSaved    = 0;
+
+// Running totals for client-side savings calculation
+let baselineKwSum   = 0;
+let optimizedKwSum  = 0;
+
+const MAX_POINTS = 120;  // rolling window for chart display
+
+// ── Clock ─────────────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('fr-TN');
+}, 1000);
+
+// ── Speed slider ──────────────────────────────────────────────────────
+document.getElementById('speed-slider').addEventListener('input', function() {
+  document.getElementById('speed-label').textContent = this.value + ' ms/pt';
+});
+
+// ── Chart factory ─────────────────────────────────────────────────────
+// Two lines: baseline vs optimised, plus attack scatter overlay
+function makeLineChart(canvasId, baseLabel, optLabel, yMax) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          // Baseline: what the city would normally consume (clean signal)
+          label: baseLabel,
+          data: [], borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.08)',
+          borderWidth: 2, pointRadius: 0, tension: 0.4, fill: false,
+        },
+        {
+          // AI Optimised output
+          label: optLabel,
+          data: [], borderColor: '#00e676',
+          backgroundColor: 'rgba(0,230,118,0.12)',
+          borderWidth: 2.5, pointRadius: 0, tension: 0.4, fill: '-1',
+        },
+        {
+          // Attack detection markers (scatter at baseline y-level)
+          label: '⚠ Attack Blocked',
+          data: [], type: 'scatter',
+          backgroundColor: '#ff174499',
+          borderColor: '#ff1744',
+          pointRadius: 5, pointStyle: 'triangle', showLine: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      animation: { duration: 0 },
+      plugins: {
+        legend: {
+          labels: { color: '#8892b0', font: { size: 11 }, boxWidth: 14 }
+        },
+        tooltip: {
+          mode: 'index', intersect: false,
+          backgroundColor: '#0c1b2e', borderColor: '#1d3a5c', borderWidth: 1,
+          titleColor: '#ccd6f6', bodyColor: '#8892b0',
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#8892b0', font: { size: 10 }, maxTicksLimit: 12 },
+          grid:  { color: '#0d2040' }
+        },
+        y: {
+          min: 0,
+          suggestedMax: yMax,
+          ticks: { color: '#8892b0', font: { size: 10 } },
+          grid:  { color: '#0d2040' }
+        }
+      }
+    }
+  });
+}
+
+function makeSavingsChart(canvasId) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Cumulative Energy Savings %',
+        data: [],
+        borderColor: '#00e676',
+        backgroundColor: 'rgba(0,230,118,0.10)',
+        borderWidth: 2.5, fill: true, tension: 0.4, pointRadius: 0,
+      }, {
+        label: 'Target (30%)',
+        data: [],
+        borderColor: '#ffab00',
+        borderWidth: 1.5, borderDash: [8, 4],
+        pointRadius: 0, fill: false, tension: 0,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      animation: { duration: 0 },
+      plugins: {
+        legend: { labels: { color: '#8892b0', font: { size: 11 }, boxWidth: 14 } },
+        tooltip: { backgroundColor: '#0c1b2e', titleColor: '#ccd6f6', bodyColor: '#8892b0' }
+      },
+      scales: {
+        x: { ticks: { color: '#8892b0', font: { size: 10 }, maxTicksLimit: 12 }, grid: { color: '#0d2040' } },
+        y: { min: 0, max: 50,
+             ticks: { color: '#8892b0', font: { size: 10 }, callback: v => v + '%' },
+             grid: { color: '#0d2040' } }
+      }
+    }
+  });
+}
+
+// ── Init charts ────────────────────────────────────────────────────────
+function initCharts() {
+  if (chartLight)   { chartLight.destroy(); }
+  if (chartWater)   { chartWater.destroy(); }
+  if (chartSavings) { chartSavings.destroy(); }
+
+  chartLight = makeLineChart(
+    'chart-lighting',
+    '💡 Baseline Consumption (kW)',
+    '✅ AI Optimised Output (kW)',
+    110
+  );
+  chartWater = makeLineChart(
+    'chart-water',
+    '💧 Baseline Flow (L/min)',
+    '✅ AI Optimised Flow (L/min)',
+    100
+  );
+  chartSavings = makeSavingsChart('chart-savings');
+}
+
+// ── Push data to chart (rolling window) ────────────────────────────────
+// baseline  = original clean signal (no spikes)
+// optimized = AI output after correction + optimisation
+// attackY   = null if clean, or the baseline value when an attack is blocked (marker position)
+function pushToChart(chart, label, baseline, optimized, attackY) {
+  const labels = chart.data.labels;
+  const ds     = chart.data.datasets;
+
+  labels.push(label);
+  ds[0].data.push(baseline);
+  ds[1].data.push(optimized);
+
+  if (attackY !== null) {
+    ds[2].data.push({ x: label, y: attackY });
+  }
+
+  // Rolling window
+  if (labels.length > MAX_POINTS) {
+    labels.shift();
+    ds[0].data.shift();
+    ds[1].data.shift();
+  }
+  if (ds[2].data.length > MAX_POINTS) ds[2].data.shift();
+
+  chart.update('none');
+}
+
+function pushSavings(chart, label, pct) {
+  chart.data.labels.push(label);
+  chart.data.datasets[0].data.push(pct);
+  chart.data.datasets[1].data.push(30);   // target line
+
+  if (chart.data.labels.length > MAX_POINTS) {
+    chart.data.labels.shift();
+    chart.data.datasets[0].data.shift();
+    chart.data.datasets[1].data.shift();
+  }
+  chart.update('none');
+}
+
+// ── Alert management ───────────────────────────────────────────────────
+function showAlert(type) {
+  const banner = document.getElementById('alert-banner');
+  const typeLabels = {
+    spike:          '⚡ SPIKE ATTACK',
+    blackout_mask:  '🌑 BLACKOUT MASK ATTACK',
+    gradual_drift:  '📈 GRADUAL DRIFT ATTACK',
+    coordinated:    '🎯 COORDINATED ATTACK',
+  };
+  const label = typeLabels[type] || 'FDI ATTACK';
+  banner.textContent = `🚨 ${label} DETECTED & BLOCKED — MALICIOUS DATA NEUTRALISED 🚨`;
+  banner.style.display = 'block';
+  if (alertTimer) clearTimeout(alertTimer);
+  alertTimer = setTimeout(() => {
+    banner.style.display = 'none';
+    isAttacking = false;
+  }, 3500);
+}
+
+// ── Log entry ──────────────────────────────────────────────────────────
+function addLogEntry(time, type, detail) {
+  const log = document.getElementById('attack-log');
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `
+    <span class="log-time">${time}</span>
+    <span class="log-type ${type}">${type.toUpperCase().replace('_',' ')}</span>
+    <span class="log-detail">${detail}</span>
+  `;
+  log.insertBefore(div, log.firstChild);
+  // Keep last 50 entries
+  while (log.children.length > 50) log.removeChild(log.lastChild);
+}
+
+// ── Update gauge ───────────────────────────────────────────────────────
+function updateGauge(f1) {
+  const pct = Math.round(f1 * 100);
+  document.getElementById('gauge-pct').textContent = pct + '%';
+  const fill = pct + '%';
+  document.getElementById('gauge-ring').style.setProperty('--f1', fill);
+}
+
+// ── Simulation controls ────────────────────────────────────────────────
+function resetSimulation() {
+  if (ws) { ws.close(); ws = null; }
+  attackCount = 0; co2Saved = 0; waterSaved = 0; costSaved = 0;
+  baselineKwSum = 0; optimizedKwSum = 0;
+  document.getElementById('alert-banner').style.display = 'none';
+  document.getElementById('conn-badge').textContent = '● Idle';
+  document.getElementById('conn-badge').className = 'connection-badge disconnected';
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('progress-text').textContent = '0 / 1440 minutes';
+  document.getElementById('kpi-savings').textContent  = '0.0%';
+  document.getElementById('kpi-attacks').textContent  = '0';
+  document.getElementById('kpi-co2').textContent      = '0 kg';
+  document.getElementById('kpi-water').textContent    = '0 m³';
+  document.getElementById('kpi-cost').textContent     = '0 TND';
+  document.getElementById('kpi-uptime').textContent   = '100%';
+  document.getElementById('gauge-pct').textContent    = '—';
+  document.getElementById('metric-precision').textContent = '—';
+  document.getElementById('metric-recall').textContent    = '—';
+  document.getElementById('metric-accuracy').textContent  = '—';
+  initCharts();
+}
+
+function startSimulation() {
+  resetSimulation();
+
+  const prob  = document.getElementById('attack-prob').value;
+  const speed = document.getElementById('speed-slider').value;
+  const wsUrl = `ws://${location.host}/ws/simulate?attack_prob=${prob}&seed=42&speed_ms=${speed}`;
+
+  document.getElementById('conn-badge').textContent  = '● Connecting…';
+  document.getElementById('conn-badge').className    = 'connection-badge connecting';
+
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    document.getElementById('conn-badge').textContent = '● Live';
+    document.getElementById('conn-badge').className   = 'connection-badge';
+    addLogEntry('--:--', 'detected', 'Guardian AI connected. Streaming data…');
+  };
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+
+    if (msg.type === 'init') {
+      totalPoints = msg.total;
+      addLogEntry('--:--', 'detected', `Pipeline ready. ${totalPoints} data points queued.`);
+      return;
+    }
+
+    if (msg.type === 'done') {
+      handleDone(msg.metrics);
+      return;
+    }
+
+    if (msg.type === 'error') {
+      addLogEntry('--:--', 'spike', 'Server error: ' + msg.message);
+      return;
+    }
+
+    // ── Data point ────────────────────────────────────────
+    const m = msg;
+
+    // Progress
+    const pct = Math.round((m.minute / totalPoints) * 100);
+    document.getElementById('progress-fill').style.width  = pct + '%';
+    document.getElementById('progress-text').textContent  = `${m.minute} / ${totalPoints} minutes`;
+
+    // Attack marker: plot at baseline level when an attack is blocked (always visible in-scale)
+    const lightAttackY = m.detected_attack ? m.lighting_original : null;
+    const waterAttackY = m.detected_attack ? m.water_original    : null;
+
+    // Push to lighting chart: baseline vs AI optimised
+    pushToChart(chartLight, m.timestamp,
+      m.lighting_original, m.lighting_optimized, lightAttackY);
+
+    // Push to water chart: baseline vs AI optimised
+    pushToChart(chartWater, m.timestamp,
+      m.water_original, m.water_optimized, waterAttackY);
+
+    // Client-side cumulative savings calculation (vs clean baseline)
+    baselineKwSum  += m.lighting_original;
+    optimizedKwSum += m.lighting_optimized;
+    const savingsPct = baselineKwSum > 0
+      ? Math.min(60, (baselineKwSum - optimizedKwSum) / baselineKwSum * 100)
+      : 0;
+
+    // Savings chart
+    pushSavings(chartSavings, m.timestamp, parseFloat(savingsPct.toFixed(1)));
+
+    // KPIs
+    document.getElementById('kpi-savings').textContent = savingsPct.toFixed(1) + '%';
+
+    if (m.detected_attack && !isAttacking) {
+      isAttacking  = true;
+      attackCount += 1;
+      document.getElementById('kpi-attacks').textContent = attackCount;
+      showAlert(m.attack_type);
+      addLogEntry(m.timestamp, m.attack_type || 'spike',
+        `Detected via ${m.detection_reason} | Anomaly score: ${m.anomaly_score}`);
+    } else if (!m.detected_attack) {
+      isAttacking = false;
+    }
+
+    // Accrue running totals (rough estimates per point)
+    co2Saved   += m.savings_pct > 0 ? 0.0008 : 0;
+    waterSaved += m.savings_pct > 0 ? 0.012  : 0;
+    costSaved  += m.savings_tnd || 0;
+
+    document.getElementById('kpi-co2').textContent   = co2Saved.toFixed(1)   + ' kg';
+    document.getElementById('kpi-water').textContent = waterSaved.toFixed(1) + ' m³';
+    document.getElementById('kpi-cost').textContent  = costSaved.toFixed(2)  + ' TND';
+  };
+
+  ws.onerror = () => {
+    document.getElementById('conn-badge').textContent = '● Error';
+    document.getElementById('conn-badge').className   = 'connection-badge disconnected';
+    addLogEntry('--:--', 'spike', 'WebSocket connection error.');
+  };
+
+  ws.onclose = () => {
+    if (document.getElementById('conn-badge').textContent !== '● Done') {
+      document.getElementById('conn-badge').textContent = '● Disconnected';
+      document.getElementById('conn-badge').className   = 'connection-badge disconnected';
+    }
+  };
+}
+
+function handleDone(metrics) {
+  document.getElementById('conn-badge').textContent = '● Done';
+  document.getElementById('conn-badge').className   = 'connection-badge';
+  document.getElementById('progress-fill').style.width  = '100%';
+  document.getElementById('progress-text').textContent  = '1440 / 1440 minutes — Complete';
+
+  // Final KPIs from metrics
+  if (metrics) {
+    document.getElementById('kpi-savings').textContent = (metrics.energy_saved_pct || 0).toFixed(1) + '%';
+    document.getElementById('kpi-attacks').textContent = metrics.attacks_detected || 0;
+    document.getElementById('kpi-co2').textContent     = (metrics.co2_saved_kg || 0).toFixed(1) + ' kg';
+    document.getElementById('kpi-water').textContent   = (metrics.water_saved_m3 || 0).toFixed(1) + ' m³';
+    document.getElementById('kpi-cost').textContent    = (metrics.cost_saved_tnd_day || 0).toFixed(2) + ' TND';
+    document.getElementById('kpi-uptime').textContent  = (metrics.uptime_pct || 100).toFixed(1) + '%';
+
+    if (metrics.f1_score) {
+      updateGauge(metrics.f1_score);
+      document.getElementById('metric-precision').textContent = ((metrics.precision || 0) * 100).toFixed(0) + '%';
+      document.getElementById('metric-recall').textContent    = ((metrics.recall    || 0) * 100).toFixed(0) + '%';
+      document.getElementById('metric-accuracy').textContent  = ((metrics.accuracy  || 0) * 100).toFixed(0) + '%';
+    }
+  }
+
+  addLogEntry('--:--', 'detected', `Simulation complete. Energy saved: ${(metrics?.energy_saved_pct||0).toFixed(1)}% · Attacks blocked: ${metrics?.attacks_detected||0}`);
+}
+
+// ── Bootstrap ──────────────────────────────────────────────────────────
+initCharts();
+addLogEntry('--:--', 'detected', 'Dashboard loaded. Press ▶ Start Simulation.');
+</script>
+</body>
+</html>
